@@ -19,15 +19,18 @@ stack:
       - Rolling_HL
       - Rolling_HR
 
-constraints: [VelocityLimits] #, Collision]
+constraints: [JointLimits, VelocityLimits] #, Collision]
 
 
 define:
  - &base_frame world
+ - &deadzone 0.005
+ - &hist_hi 0.0025
+ - &hist_lo 0.0001
 
 JointLimits:
     type: JointLimits
-    bound_scaling: 0.95
+#    bound_scaling: 0.95
     limits:
       j_arm2_4: [-2.4, -0.6]
       j_arm1_4: [-2.4, -0.6]
@@ -51,42 +54,57 @@ Collision:
     distance_threshold: 0.02
     max_pairs: 30
     collision_urdf_path: $(rospack find centauro_urdf)/urdf/centauro_capsule.urdf
-    collision_srdf_path: $(rospack find centauro_urdf)/srdf/centauro_capsule.srdf
-
+    collision_srdf_path: $(rospack find centauro_srdf)/srdf/centauro_capsule.srdf
 
 Steering_FL:
     type: CentauroSteering
     wheel_name: wheel_1
-#    hysteresis_comparator:
-#      - 0.01
-#      - 0.05
+    weight: 1000
+    deadzone:
+      - *deadzone
+      - *deadzone
+    hysteresis_comparator:
+      - *hist_lo
+      - *hist_hi
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
 Steering_FR:
     type: CentauroSteering
     wheel_name: wheel_2
-#    hysteresis_comparator:
-#      - 0.01
-#      - 0.05
+    weight: 1000
+    deadzone:
+      - *deadzone
+      - *deadzone
+    hysteresis_comparator:
+      - *hist_lo
+      - *hist_hi
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
 Steering_HL:
     type: CentauroSteering
     wheel_name: wheel_3
-#    hysteresis_comparator:
-#      - 0.01
-#      - 0.05
+    weight: 1000
+    deadzone:
+      - *deadzone
+      - *deadzone
+    hysteresis_comparator:
+      - *hist_lo
+      - *hist_hi
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
 Steering_HR:
     type: CentauroSteering
     wheel_name: wheel_4
-#    hysteresis_comparator:
-#      - 0.01
-#      - 0.05
+    weight: 1000
+    deadzone:
+      - *deadzone
+      - *deadzone
+    hysteresis_comparator:
+      - *hist_lo
+      - *hist_hi
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
@@ -124,7 +142,6 @@ Postural:
     lambda: 0.01
     weight: 1.0
     disabled_joints:
-
       - ankle_yaw_1
       - ankle_yaw_2
       - ankle_yaw_3
