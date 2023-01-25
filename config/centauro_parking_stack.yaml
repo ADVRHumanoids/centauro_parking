@@ -24,7 +24,6 @@ constraints: [JointLimits, VelocityLimits] #, Collision]
 
 define:
  - &base_frame world
- - &deadzone 0.005
  - &hist_hi 0.0025
  - &hist_lo 0.0001
 
@@ -60,12 +59,6 @@ Steering_FL:
     type: CentauroSteering
     wheel_name: wheel_1
     weight: 1000
-    deadzone:
-      - *deadzone
-      - *deadzone
-    hysteresis_comparator:
-      - *hist_lo
-      - *hist_hi
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
@@ -73,12 +66,6 @@ Steering_FR:
     type: CentauroSteering
     wheel_name: wheel_2
     weight: 1000
-    deadzone:
-      - *deadzone
-      - *deadzone
-    hysteresis_comparator:
-      - *hist_lo
-      - *hist_hi
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
@@ -86,12 +73,6 @@ Steering_HL:
     type: CentauroSteering
     wheel_name: wheel_3
     weight: 1000
-    deadzone:
-      - *deadzone
-      - *deadzone
-    hysteresis_comparator:
-      - *hist_lo
-      - *hist_hi
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
@@ -99,12 +80,6 @@ Steering_HR:
     type: CentauroSteering
     wheel_name: wheel_4
     weight: 1000
-    deadzone:
-      - *deadzone
-      - *deadzone
-    hysteresis_comparator:
-      - *hist_lo
-      - *hist_hi
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
