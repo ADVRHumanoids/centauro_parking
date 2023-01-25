@@ -4,8 +4,7 @@ from xbot_interface import xbot_interface as xbot
 import numpy as np
 import rospy
 import rospkg
-import argcomplete, argparse
-from argcomplete.completers import EnvironCompleter
+import argparse
 from pathlib import Path
 
 file_dir = str(Path(__file__).parent.absolute())
@@ -39,21 +38,6 @@ def update_ik(ci, model, time, dt):
     model.setJointPosition(q)
     model.update()
     return q, qdot
-
-def getError(ci, model):
-    error = 0
-    for task in ci.getTaskList():
-        t = ci.getTask(task)
-        actual = model.getPose(task)
-        try:
-            reference = t.getPoseReference()
-        except AttributeError:
-            continue
-
-        pos_error = actual.translation[2] - reference[0].translation[2]
-
-        error += np.linalg.norm(pos_error)
-    return error
 
 def quintic(alpha):
     if alpha < 0:
@@ -116,24 +100,24 @@ args = parser.parse_args()
 parking = bool
 if args.park:
     parking = True
-    input(bcolors.OKGREEN + 'Start Parking: click to confirm')
+    input(bcolors.OKGREEN + 'Start Parking: click to confirm' + bcolors.ENDC)
 elif args.unpark:
     parking = False
-    input(bcolors.OKGREEN + 'Start Unparking: click to confirm')
+    input(bcolors.OKGREEN + 'Start Unparking: click to confirm' + bcolors.ENDC)
 else:
-    print(bcolors.FAIL + "Missing mandatory argument '--park' '--unpark'")
+    print(bcolors.FAIL + "Missing mandatory argument '--park' '--unpark'" + bcolors.ENDC)
     exit()
 
+# create XBot config object
 urdf_path = rospkg.RosPack().get_path('centauro_urdf') + '/urdf/centauro.urdf'
 urdf = open(urdf_path, 'r').read()
-rospy.set_param('/robot_description', urdf)
 
 srdf_path = rospkg.RosPack().get_path('centauro_srdf') + '/srdf/centauro.srdf'
 srdf = open(srdf_path, 'r').read()
-rospy.set_param('/robot_description_semantic', srdf)
 
 cfg = get_xbot_cfg(urdf, srdf)
 
+# create ModelInterface and RobotInterface (if xbot is running)
 try:
     robot = xbot.RobotInterface(cfg)
     robot.sense()
@@ -148,6 +132,7 @@ except:
 
 model = xbot.ModelInterface(cfg)
 if robot is not None:
+    # sync ModelInterface to RobotInterface current position references to avoid discontinuities
     qref = robot.getPositionReference()
     qref = [0., 0., 0., 0., 0., 0.] + qref.tolist()
     model.setJointPosition(qref)
@@ -157,6 +142,7 @@ else:
     w_T_base = model.getPose('base_link')
     w_T_h = compute_h_frame(model, w_T_base, contacts)
     model.setFloatingBasePose(w_T_h.inverse() * w_T_base)
+    # if RobotInterface is not found start the ModelInterface in homing if parking or in rest configuration if unparking
     if parking:
         qhome = model.getRobotState("home")
         model.setJointPosition(qhome)
@@ -191,12 +177,13 @@ ikpb = open(file_dir + '/../config/centauro_parking_stack.yaml', 'r').read()
 ci = pyci.CartesianInterface.MakeInstance('OpenSot', ikpb, model, dt)
 postural = ci.getTask('Postural')
 
+# always start from ModelInterface current configuration
 q1 = model.getJointPosition()
 q1 = model.eigenToMap(q1)
 
 q2 = list()
-
 if parking:
+    # generate intermediate pose: pitch folded and ankle perpendicular to the ground
     q2 = q1.copy()
     q2["hip_yaw_1"] = -0.75
     q2["hip_yaw_2"] = 0.75
@@ -219,6 +206,7 @@ if parking:
     q2["ankle_yaw_3"] = 0.0
     q2["ankle_yaw_4"] = 0.0
 
+    # generate final configuration: if parking -> fold the ankle
     q3 = q2.copy()
     q3['ankle_pitch_1'] = -2.41
     q3['ankle_pitch_2'] = 2.41
@@ -226,6 +214,7 @@ if parking:
     q3['ankle_pitch_4'] = -2.41
 
 else:
+    # generate intermediate pose: pitch folded and ankle perpendicular to the ground
     q2 = q1.copy()
     q2["hip_yaw_1"] = -0.75
     q2["hip_yaw_2"] = 0.75
@@ -248,25 +237,27 @@ else:
     q2["ankle_yaw_3"] = 0.0
     q2["ankle_yaw_4"] = 0.0
 
+    # generate final configuration: if unparking -> homing
     q3 = model.getRobotState("home")
     q3 = model.eigenToMap(q3)
 
 T = 5.0
 rate = rospy.Rate(1./dt)
 
+# solve ik to move from q1 to q2
 qinit = q1
 qgoal = q2
-
 cartesian_motion(q1, q2, T, dt, ci)
 
+# disable steering in the last phase to avoid strange motion during the ankle folding
 if parking:
     ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
     ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
     ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
     ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
 
+# solve ik to move from q2 to q3
 qinit = q2
 qgoal = q3
-
 cartesian_motion(q2, q3, T, dt, ci)
 
