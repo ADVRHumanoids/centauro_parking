@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from cartesian_interface.pyci_all import *
 from xbot_interface import config_options as co
 from xbot_interface import xbot_interface as xbot
@@ -5,9 +7,13 @@ import numpy as np
 import rospy
 import rospkg
 import argparse
-from pathlib import Path
+import os, sys
 
-file_dir = str(Path(__file__).parent.absolute())
+file_dir = os.path.dirname(os.path.abspath(__file__))
+
+if sys.version_info[0] < 3:
+    input = raw_input
+
 
 class bcolors:
     HEADER = '\033[95m'
@@ -93,6 +99,7 @@ def cartesian_motion(qinit, qgoal, T, dt, ci):
 rospy.init_node('contact_homing')
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--unattended", action="store_true", help='the script does not ask for user confirmation before executing the action')
 parser.add_argument("--park", action="store_true")
 parser.add_argument("--unpark", action="store_true")
 args = parser.parse_args()
@@ -100,10 +107,12 @@ args = parser.parse_args()
 parking = bool
 if args.park:
     parking = True
-    input(bcolors.OKGREEN + 'Start Parking: click to confirm' + bcolors.ENDC)
+    if not args.unattended:
+        input(bcolors.OKGREEN + 'Start Parking: click to confirm' + bcolors.ENDC)
 elif args.unpark:
     parking = False
-    input(bcolors.OKGREEN + 'Start Unparking: click to confirm' + bcolors.ENDC)
+    if not args.unattended:
+        input(bcolors.OKGREEN + 'Start Unparking: click to confirm' + bcolors.ENDC)
 else:
     print(bcolors.FAIL + "Missing mandatory argument '--park' '--unpark'" + bcolors.ENDC)
     exit()
