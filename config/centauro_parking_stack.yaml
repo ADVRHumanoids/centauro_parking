@@ -6,30 +6,15 @@ solver_options:
 
 
 stack:
-    -
-      - Postural
+    - ["Steering_FL", "Steering_FR", "Steering_HL", "Steering_HR", "Rolling_FL", "Rolling_FR", "Rolling_HL", "Rolling_HR", "Postural"]
+#    - ["Postural"]
 
-      - Steering_FL
-      - Steering_FR
-      - Steering_HL
-      - Steering_HR
-
-      - Rolling_FL
-      - Rolling_FR
-      - Rolling_HL
-      - Rolling_HR
 
 constraints: [JointLimits, VelocityLimits] #, Collision]
 
 
-define:
- - &base_frame world
- - &hist_hi 0.0025
- - &hist_lo 0.0001
-
 JointLimits:
     type: JointLimits
-#    bound_scaling: 0.95
     limits:
       j_arm2_4: [-2.4, -0.6]
       j_arm1_4: [-2.4, -0.6]
@@ -58,28 +43,28 @@ Collision:
 Steering_FL:
     type: CentauroSteering
     wheel_name: wheel_1
-    weight: 1000
+    weight: 100.0
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
 Steering_FR:
     type: CentauroSteering
     wheel_name: wheel_2
-    weight: 1000
+    weight: 100.0
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
 Steering_HL:
     type: CentauroSteering
     wheel_name: wheel_3
-    weight: 1000
+    weight: 100.0
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
 Steering_HR:
     type: CentauroSteering
     wheel_name: wheel_4
-    weight: 1000
+    weight: 100.0
     lib_name: libcentauro_cartesio_addon.so
     lambda: 0.1
 
@@ -115,12 +100,12 @@ Rolling_HR:
 Postural:
     type: Postural
     lambda: 0.01
-    weight: 1.0
+    weight: 0.1
     disabled_joints:
-      #- ankle_yaw_1
-      #- ankle_yaw_2
-      #- ankle_yaw_3
-      #- ankle_yaw_4
+#      - ankle_yaw_1
+#      - ankle_yaw_2
+#      - ankle_yaw_3
+#      - ankle_yaw_4
       - j_wheel_1
       - j_wheel_2
       - j_wheel_3

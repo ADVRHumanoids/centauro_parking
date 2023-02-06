@@ -74,7 +74,7 @@ def compute_h_frame(model, w_T_base, contacts):
     Th.translation = p
     return Th
 
-def cartesian_motion(qinit, qgoal, T, dt, ci):
+def cartesian_motion(qinit, qgoal, T, dt, ci, parking):
     time = 0
     while True:
         tau = time / T
@@ -92,8 +92,24 @@ def cartesian_motion(qinit, qgoal, T, dt, ci):
             robot.move()
 
         time += dt
-        if time > T and np.linalg.norm(qdot) < 0.1:
-            break
+        if time > 0.8 * T:
+            # disable steering in the last phase to avoid strange motion during the ankle folding
+            if parking:
+                if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Enabled:
+                    print(bcolors.OKGREEN + 'Disabling steering tasks' + bcolors.ENDC)
+                    ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
+                    ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
+                    ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
+                    ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
+            else:
+                if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Disabled:
+                    print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
+                    ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
+                    ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
+                    ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
+                    ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
+            if np.linalg.norm(qdot) < 0.1:
+                break
         rate.sleep()
 
 rospy.init_node('contact_homing')
@@ -159,6 +175,8 @@ else:
     else:
         q = model.getRobotState("home")
         q = model.eigenToMap(q)
+        q["hip_yaw_1"] = 0.47
+        q["hip_yaw_3"] = 0.47
         q["hip_pitch_1"] = -1.57
         q["hip_pitch_2"] = 1.57
         q["hip_pitch_3"] = 1.57
@@ -225,10 +243,10 @@ if parking:
 else:
     # generate intermediate pose: pitch folded and ankle perpendicular to the ground
     q2 = q1.copy()
-    q2["hip_yaw_1"] = -0.75
-    q2["hip_yaw_2"] = 0.75
-    q2["hip_yaw_3"] = 0.75
-    q2["hip_yaw_4"] = -0.75
+    # q2["hip_yaw_1"] = -0.75
+    # q2["hip_yaw_2"] = 0.75
+    # q2["hip_yaw_3"] = 0.75
+    # q2["hip_yaw_4"] = -0.75
     q2["hip_pitch_1"] = -1.57
     q2["hip_pitch_2"] = 1.57
     q2["hip_pitch_3"] = 1.57
@@ -249,56 +267,44 @@ else:
     # generate final configuration: if unparking -> homing
     q3 = model.getRobotState("home")
     q3 = model.eigenToMap(q3)
+    q3["ankle_yaw_1"] = 0.0
+    q3["ankle_yaw_2"] = 0.0
+    q3["ankle_yaw_3"] = 0.0
+    q3["ankle_yaw_4"] = 0.0
 
 
 rate = rospy.Rate(1./dt)
 
 if not parking:
-	q = q1.copy()
-	q['ankle_yaw_1'] = 0.0
-	q['ankle_yaw_2'] = 0.0
-	q['ankle_yaw_3'] = 0.0
-	q['ankle_yaw_4'] = 0.0
-	time = 0 
-	T = 3.0
-	while time < T:
-		tau = time / T
-		alpha = quintic(tau)
-		qref = model.mapToEigen(q1) * (1 - alpha) + model.mapToEigen(q) * alpha
-		model.setJointPosition(qref)
-		model.update()
-		rspub.publishTransforms('park')
-		if robot is not None:
-			robot.setPositionReference(qref[6:])
-			robot.move()
-		time += dt 
-		rate.sleep()
-	ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
-	ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
-	ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
-	ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
-	q1 = q.copy()
-
-# solve ik to move from q1 to q2
-T = 5.0
-qinit = q1
-qgoal = q2
-cartesian_motion(q1, q2, T, dt, ci)
-
-# disable steering in the last phase to avoid strange motion during the ankle folding
-if parking:
+    q = q1.copy()
+    q['ankle_yaw_1'] = 0.0
+    q['ankle_yaw_2'] = 0.0
+    q['ankle_yaw_3'] = 0.0
+    q['ankle_yaw_4'] = 0.0
+    time = 0
+    T = 3.0
+    while time < T:
+        tau = time / T
+        alpha = quintic(tau)
+        qref = model.mapToEigen(q1) * (1 - alpha) + model.mapToEigen(q) * alpha
+        model.setJointPosition(qref)
+        model.update()
+        rspub.publishTransforms('park')
+        if robot is not None:
+            robot.setPositionReference(qref[6:])
+            robot.move()
+        time += dt
+        rate.sleep()
     ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
     ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
     ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
     ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
-else:
-	ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
-	ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
-	ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
-	ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
+    q1 = q.copy()
+
+# solve ik to move from q1 to q2
+T = 5.0
+cartesian_motion(q1, q2, T, dt, ci, parking)
 
 # solve ik to move from q2 to q3
-qinit = q2
-qgoal = q3
-cartesian_motion(q2, q3, T, dt, ci)
+cartesian_motion(q2, q3, T, dt, ci, parking)
 
