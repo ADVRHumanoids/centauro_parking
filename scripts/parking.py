@@ -92,24 +92,26 @@ def cartesian_motion(qinit, qgoal, T, dt, ci, parking):
             robot.move()
 
         time += dt
-        if time > 0.8 * T:
-            # disable steering in the last phase to avoid strange motion during the ankle folding
-            if parking:
+        if parking:
+            if time > T:
                 if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Enabled:
-                    print(bcolors.OKGREEN + 'Disabling steering tasks' + bcolors.ENDC)
-                    ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
-                    ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
-                    ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
-                    ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
-            else:
+                    if np.linalg.norm(qdot) < 0.1:
+                        print(bcolors.OKGREEN + 'Disabling steering tasks' + bcolors.ENDC)
+                        ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
+                        ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
+                        ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
+                        ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
+                        break
+        else:
+            if time > 0.8 * T:
                 if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Disabled:
                     print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
                     ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
                     ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
                     ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
                     ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
-            if np.linalg.norm(qdot) < 0.1:
-                break
+                if np.linalg.norm(qdot) < 0.1:
+                    break
         rate.sleep()
 
 rospy.init_node('contact_homing')
