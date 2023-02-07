@@ -94,16 +94,16 @@ def cartesian_motion(qinit, qgoal, T, dt, ci, parking):
         time += dt
         if parking:
             if time > T:
-                if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Enabled:
-                    if np.linalg.norm(qdot) < 0.1:
+                if np.linalg.norm(qdot) < 0.1:
+                    if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Enabled:
                         print(bcolors.OKGREEN + 'Disabling steering tasks' + bcolors.ENDC)
                         ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
                         ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
                         ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
                         ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
-                        break
+                    break
         else:
-            if time > 0.8 * T:
+            if time > T:
                 if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Disabled:
                     print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
                     ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
@@ -177,8 +177,6 @@ else:
     else:
         q = model.getRobotState("home")
         q = model.eigenToMap(q)
-        q["hip_yaw_1"] = 0.47
-        q["hip_yaw_3"] = 0.47
         q["hip_pitch_1"] = -1.57
         q["hip_pitch_2"] = 1.57
         q["hip_pitch_3"] = 1.57
