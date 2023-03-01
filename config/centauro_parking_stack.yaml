@@ -6,7 +6,8 @@ solver_options:
 
 
 stack:
-    - ["Steering_FL", "Steering_FR", "Steering_HL", "Steering_HR", "Rolling_FL", "Rolling_FR", "Rolling_HL", "Rolling_HR", "Postural"]
+    - ["Steering_FL", "Steering_FR", "Steering_HL", "Steering_HR", "Rolling_FL", "Rolling_FR", "Rolling_HL", "Rolling_HR", "Postural", 'Wheel1', 'Wheel2', 'Wheel3', 'Wheel4']
+#    - []
 #    - ["Postural"]
 
 
@@ -25,7 +26,7 @@ VelocityLimits:
     limits:
       VIRTUALJOINT_1: 0.0
       VIRTUALJOINT_2: 0.0
-      VIRTUALJOINT_3: 0.0
+#      VIRTUALJOINT_3: 0.0
       VIRTUALJOINT_4: 0.0
       VIRTUALJOINT_5: 0.0
       VIRTUALJOINT_6: 0.0
@@ -96,12 +97,37 @@ Rolling_HR:
     wheel_radius: 0.078
     weight: 1.0
 
+Wheel1:
+    type: 'Cartesian'
+    distal_link: 'wheel_1'
+    indices: [2]
+
+Wheel2:
+    type: 'Cartesian'
+    distal_link: 'wheel_2'
+    indices: [2]
+
+Wheel3:
+    type: 'Cartesian'
+    distal_link: 'wheel_3'
+    indices: [2]
+
+Wheel4:
+    type: 'Cartesian'
+    distal_link: 'wheel_4'
+    indices: [2]
 
 Postural:
     type: Postural
     lambda: 0.01
     weight: 0.1
     disabled_joints:
+#      - VIRTUALJOINT_1
+#      - VIRTUALJOINT_2
+      - VIRTUALJOINT_3
+#      - VIRTUALJOINT_4
+#      - VIRTUALJOINT_5
+#      - VIRTUALJOINT_6
       - ankle_yaw_1
       - ankle_yaw_2
       - ankle_yaw_3

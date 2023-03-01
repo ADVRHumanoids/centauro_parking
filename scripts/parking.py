@@ -114,6 +114,33 @@ def cartesian_motion(qinit, qgoal, T, dt, ci, parking):
                     break
         rate.sleep()
 
+def rotate_wheels(qinit):
+    q = qinit.copy()
+    q['ankle_yaw_1'] = 0.0
+    q['ankle_yaw_2'] = 0.0
+    q['ankle_yaw_3'] = 0.0
+    q['ankle_yaw_4'] = 0.0
+    time = 0
+    T = 1.0
+    while time < T:
+        tau = time / T
+        alpha = quintic(tau)
+        qref = model.mapToEigen(qinit) * (1 - alpha) + model.mapToEigen(q) * alpha
+        model.setJointPosition(qref)
+        model.update()
+        rspub.publishTransforms('park')
+        if robot is not None:
+            robot.setPositionReference(qref[6:])
+            robot.move()
+        time += dt
+        rate.sleep()
+    ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
+    ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
+    ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
+    ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
+
+    return q
+
 rospy.init_node('contact_homing')
 
 parser = argparse.ArgumentParser()
@@ -276,35 +303,23 @@ else:
 rate = rospy.Rate(1./dt)
 
 if not parking:
-    q = q1.copy()
-    q['ankle_yaw_1'] = 0.0
-    q['ankle_yaw_2'] = 0.0
-    q['ankle_yaw_3'] = 0.0
-    q['ankle_yaw_4'] = 0.0
-    time = 0
-    T = 3.0
-    while time < T:
-        tau = time / T
-        alpha = quintic(tau)
-        qref = model.mapToEigen(q1) * (1 - alpha) + model.mapToEigen(q) * alpha
-        model.setJointPosition(qref)
-        model.update()
-        rspub.publishTransforms('park')
-        if robot is not None:
-            robot.setPositionReference(qref[6:])
-            robot.move()
-        time += dt
-        rate.sleep()
-    ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
-    ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
-    ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
-    ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
-    q1 = q.copy()
+    q1 = rotate_wheels(q1)
 
 # solve ik to move from q1 to q2
 T = 5.0
 cartesian_motion(q1, q2, T, dt, ci, parking)
 
+if parking:
+    q2 = rotate_wheels(q2)
+
 # solve ik to move from q2 to q3
+q = model.getJointPositionMap()
+q2['VIRTUALJOINT_1'] = q['VIRTUALJOINT_1']
+q2['VIRTUALJOINT_2'] = q['VIRTUALJOINT_2']
+q2['VIRTUALJOINT_3'] = q['VIRTUALJOINT_3']
+q2['VIRTUALJOINT_4'] = q['VIRTUALJOINT_4']
+q2['VIRTUALJOINT_5'] = q['VIRTUALJOINT_5']
+q2['VIRTUALJOINT_6'] = q['VIRTUALJOINT_6']
+
 cartesian_motion(q2, q3, T, dt, ci, parking)
 
