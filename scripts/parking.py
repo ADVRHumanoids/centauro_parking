@@ -94,7 +94,7 @@ def cartesian_motion(qinit, qgoal, T, dt, ci, parking):
         time += dt
         if parking:
             if time > T:
-                if np.linalg.norm(qdot) < 0.1:
+                if np.linalg.norm(qdot) < 0.01:
                     if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Enabled:
                         print(bcolors.OKGREEN + 'Disabling steering tasks' + bcolors.ENDC)
                         ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
@@ -110,7 +110,7 @@ def cartesian_motion(qinit, qgoal, T, dt, ci, parking):
                     ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
                     ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
                     ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
-                if np.linalg.norm(qdot) < 0.1:
+                if np.linalg.norm(qdot) < 0.01:
                     break
         rate.sleep()
 
@@ -247,10 +247,10 @@ if parking:
     q2["hip_pitch_2"] = 1.57
     q2["hip_pitch_3"] = 1.57
     q2["hip_pitch_4"] = -1.57
-    q2["knee_pitch_1"] = -2.41
-    q2["knee_pitch_2"] = 2.41
-    q2["knee_pitch_3"] = 2.41
-    q2["knee_pitch_4"] = -2.41
+    q2["knee_pitch_1"] = -2.4
+    q2["knee_pitch_2"] = 2.4
+    q2["knee_pitch_3"] = 2.4
+    q2["knee_pitch_4"] = -2.4
     q2["ankle_pitch_1"] = -0.84
     q2["ankle_pitch_2"] = 0.84
     q2["ankle_pitch_3"] = 0.84
@@ -262,10 +262,10 @@ if parking:
 
     # generate final configuration: if parking -> fold the ankle
     q3 = q2.copy()
-    q3['ankle_pitch_1'] = -2.41
-    q3['ankle_pitch_2'] = 2.41
-    q3['ankle_pitch_3'] = 2.41
-    q3['ankle_pitch_4'] = -2.41
+    q3['ankle_pitch_1'] = -2.4
+    q3['ankle_pitch_2'] = 2.4
+    q3['ankle_pitch_3'] = 2.4
+    q3['ankle_pitch_4'] = -2.4
 
 else:
     # generate intermediate pose: pitch folded and ankle perpendicular to the ground
@@ -278,10 +278,10 @@ else:
     q2["hip_pitch_2"] = 1.57
     q2["hip_pitch_3"] = 1.57
     q2["hip_pitch_4"] = -1.57
-    q2["knee_pitch_1"] = -2.41
-    q2["knee_pitch_2"] = 2.41
-    q2["knee_pitch_3"] = 2.41
-    q2["knee_pitch_4"] = -2.41
+    q2["knee_pitch_1"] = -2.4
+    q2["knee_pitch_2"] = 2.4
+    q2["knee_pitch_3"] = 2.4
+    q2["knee_pitch_4"] = -2.4
     q2["ankle_pitch_1"] = -0.84
     q2["ankle_pitch_2"] = 0.84
     q2["ankle_pitch_3"] = 0.84
@@ -309,9 +309,6 @@ if not parking:
 T = 5.0
 cartesian_motion(q1, q2, T, dt, ci, parking)
 
-if parking:
-    q2 = rotate_wheels(q2)
-
 # solve ik to move from q2 to q3
 q = model.getJointPositionMap()
 q2['VIRTUALJOINT_1'] = q['VIRTUALJOINT_1']
@@ -320,6 +317,9 @@ q2['VIRTUALJOINT_3'] = q['VIRTUALJOINT_3']
 q2['VIRTUALJOINT_4'] = q['VIRTUALJOINT_4']
 q2['VIRTUALJOINT_5'] = q['VIRTUALJOINT_5']
 q2['VIRTUALJOINT_6'] = q['VIRTUALJOINT_6']
+
+if parking:
+    q2 = rotate_wheels(q2)
 
 cartesian_motion(q2, q3, T, dt, ci, parking)
 
