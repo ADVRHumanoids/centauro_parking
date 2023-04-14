@@ -147,9 +147,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--unattended", action="store_true", help='the script does not ask for user confirmation before executing the action')
 parser.add_argument("--park", action="store_true")
 parser.add_argument("--unpark", action="store_true")
+parser.add_argument('--box', action="store_true")
 args = parser.parse_args()
 
 parking = bool
+box = bool
 if args.park:
     parking = True
     if not args.unattended:
@@ -161,6 +163,11 @@ elif args.unpark:
 else:
     print(bcolors.FAIL + "Missing mandatory argument '--park' '--unpark'" + bcolors.ENDC)
     exit()
+
+if args.box:
+    box = True
+else:
+    box = False
 
 # create XBot config object
 urdf_path = rospkg.RosPack().get_path('centauro_urdf') + '/urdf/centauro.urdf'
@@ -239,10 +246,16 @@ q2 = list()
 if parking:
     # generate intermediate pose: pitch folded and ankle perpendicular to the ground
     q2 = q1.copy()
-    q2["hip_yaw_1"] = -0.75
-    q2["hip_yaw_2"] = 0.75
-    q2["hip_yaw_3"] = 0.75
-    q2["hip_yaw_4"] = -0.75
+    if box:
+        q2["hip_yaw_1"] = 0 #-0.75
+        q2["hip_yaw_2"] = 0 #0.75
+        q2["hip_yaw_3"] = 0 #0.75
+        q2["hip_yaw_4"] = 0 #-0.75
+    else:
+        q2["hip_yaw_1"] = -0.75
+        q2["hip_yaw_2"] = 0.75
+        q2["hip_yaw_3"] = 0.75
+        q2["hip_yaw_4"] = -0.75
     q2["hip_pitch_1"] = -1.57
     q2["hip_pitch_2"] = 1.57
     q2["hip_pitch_3"] = 1.57
@@ -264,8 +277,12 @@ if parking:
     q3 = q2.copy()
     q3['ankle_pitch_1'] = -2.4
     q3['ankle_pitch_2'] = 2.4
-    q3['ankle_pitch_3'] = 2.4
-    q3['ankle_pitch_4'] = -2.4
+    if box:
+        q3['ankle_pitch_3'] = 2.4 - np.pi
+        q3['ankle_pitch_4'] = -2.4 + np.pi
+    else:
+        q3['ankle_pitch_3'] = 2.4
+        q3['ankle_pitch_4'] = -2.4
 
 else:
     # generate intermediate pose: pitch folded and ankle perpendicular to the ground
@@ -321,5 +338,9 @@ q2['VIRTUALJOINT_6'] = q['VIRTUALJOINT_6']
 if parking:
     q2 = rotate_wheels(q2)
 
-cartesian_motion(q2, q3, T, dt, ci, parking)
+if parking:
+    cartesian_motion(q2, q3, T, dt, ci, parking)
+else:
+    if not box:
+        cartesian_motion(q2, q3, T, dt, ci, parking)
 
