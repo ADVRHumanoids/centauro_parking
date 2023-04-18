@@ -40,10 +40,6 @@ q_unparking:
   ankle_pitch_2: 0.84
   ankle_pitch_3: 0.84
   ankle_pitch_4: -0.84
-  ankle_yaw_1: 0.0
-  ankle_yaw_2: 0.0
-  ankle_yaw_3: 0.0
-  ankle_yaw_4: 0.0
 
 q_homing:
   hip_yaw_1: -0.75
@@ -104,48 +100,42 @@ q_boxing_3:
   ankle_pitch_3: -0.74
   ankle_pitch_4: 0.74
 
-q_unboxing:
-  hip_pitch_1: -1.57
-  hip_pitch_2: 1.57
-  hip_pitch_3: 1.57
-  hip_pitch_4: -1.57
-  knee_pitch_1: -2.4
-  knee_pitch_2: 2.4
-  knee_pitch_3: 2.4
-  knee_pitch_4: -2.4
-  ankle_pitch_1: -0.84
-  ankle_pitch_2: 0.84
-  ankle_pitch_3: 0.84
-  ankle_pitch_4: -0.84
-
 actions:
   parking:
-    - steering: true
-      q: q_parking_2
+    - q_parking_2:
+        steering: true
+        change_steering: false
     - rotate_wheels
-    - steering: false
-      q: q_parking_3
+    - q_parking_3:
+        steering: false
+        change_steering: false
 
   unparking:
     - rotate_wheels
-    - steering: false
-      q: q_unparking
-    - steering: true
-      q: q_homing
+    - q_unparking:
+        steering: false
+        change_steering: true
+    - q_homing:
+        steering: true
+        change_steering: false
 
   boxing:
-    - steering: true
-      q: q_boxing_2
+    - q_boxing_2:
+        steering: true
+        change_steering: false
     - rotate_wheels
-    - steering: false
-      q: q_boxing_3
+    - q_boxing_3:
+        steering: false
+        change_steering: false
 
   unboxing:
     - rotate_wheels
-    - steering: false
-      q: q_unboxing
+    - q_unparking:
+        steering: false
+        change_steering: true
 
   homing:
-    - steering: true
-      q: q_homing
+    - q_homing:
+        steering: true
+        change_steering: false
 

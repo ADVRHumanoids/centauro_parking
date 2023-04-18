@@ -54,29 +54,7 @@ def quintic(alpha):
     else:
         return ((6*alpha - 15)*alpha + 10)*alpha**3
 
-def compute_h_frame(model, w_T_base, contacts):
-    points = np.ones((3, len(contacts)))
-    for i, c in enumerate(contacts):
-        points[:, i] = model.getPose(c).translation
-    points = points - np.mean(points, axis=1, keepdims=True)
-    U, S, V = np.linalg.svd(points)
-    print(points, U, S, V)
-    n = U[:, -1]
-    if n[2] < 0:
-        n *= -1
-    a = w_T_base.linear[:, 0]
-    s = np.cross(n, a)  # x ^ z = y
-    p = w_T_base.translation
-
-
-    Th = Affine3()
-    print(np.vstack([a, s, n]).T)
-    Th.linear = np.vstack([a, s, n]).T
-    Th.translation = p
-    return Th
-
-def cartesian_motion(qinit, qgoal, T, dt, ci, steering):
-    # set steering state...
+def cartesian_motion(qinit, qgoal, T, dt, ci, steering, change_steering):
     if steering:
         print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
         ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
@@ -99,7 +77,6 @@ def cartesian_motion(qinit, qgoal, T, dt, ci, steering):
         postural.setReferencePosture(qref)
 
         q, qdot = update_ik(ci, model, time, dt)
-        rspub.publishTransforms('park')
 
         if robot is not None:
             robot.setPositionReference(q[6:])
@@ -108,20 +85,13 @@ def cartesian_motion(qinit, qgoal, T, dt, ci, steering):
 
         time += dt
 
-        # ...and change it before the action ends to avoid useless yaw rotations
         if time > T:
-            if not steering and ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Disabled:
+            if change_steering and ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Disabled:
                 print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
                 ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
                 ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
                 ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
                 ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
-            # else:
-            #     print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
-            #     ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
-            #     ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
-            #     ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
-            #     ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
             if np.linalg.norm(qdot) < 0.01:
                 break
 
@@ -141,16 +111,41 @@ def rotate_wheels(qinit):
         qref = model.mapToEigen(qinit) * (1 - alpha) + model.mapToEigen(q) * alpha
         model.setJointPosition(qref)
         model.update()
-        rspub.publishTransforms('park')
-        if robot is not None:
-            robot.setPositionReference(qref[6:])
-            robot.move()
+        robot.setPositionReference(qref[6:])
+        robot.move()
         time += dt
         rate.sleep()
-    ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
-    ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
-    ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
-    ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
+
+    return q
+
+def rotate_ankle_pitch(qinit, fold, box=False):
+    q = qinit.copy()
+    if fold:
+        q['ankle_pitch_1'] = -2.4
+        q['ankle_pitch_2'] = 2.4
+        if box:
+            q['ankle_pitch_3'] = 2.4 - np.pi
+            q['ankle_pitch_4'] = -2.4 + np.pi
+        else:
+            q['ankle_pitch_3'] = 2.4
+            q['ankle_pitch_4'] = -2.4
+    else:
+        q['ankle_pitch_1'] = -0.84
+        q['ankle_pitch_2'] = 0.84
+        q['ankle_pitch_3'] = 0.84
+        q['ankle_pitch_4'] = -0.84
+    time = 0
+    T = 5.0
+    while time < T:
+        tau = time / T
+        alpha = quintic(tau)
+        qref = model.mapToEigen(qinit) * (1 - alpha) + model.mapToEigen(q) * alpha
+        model.setJointPosition(qref)
+        model.update()
+        robot.setPositionReference(qref[6:])
+        robot.move()
+        time += dt
+        rate.sleep()
 
     return q
 
@@ -165,7 +160,7 @@ parser.add_argument("--unattended", action="store_true", help='the script does n
 parser.add_argument("--action", choices=q_cfg['actions'].keys())
 args = parser.parse_args()
 
-args.action = 'unparking'
+args.action = 'boxing'
 
 # create XBot config object
 urdf_path = rospkg.RosPack().get_path('centauro_urdf') + '/urdf/centauro.urdf'
@@ -196,9 +191,6 @@ qref = [0., 0., 0., 0., 0., 0.] + qref.tolist()
 model.setJointPosition(qref)
 model.update()
 
-rspub = pyci.RobotStatePublisher(model)
-rspub.publishTransforms('park')
-
 dt = 0.01
 ikpb = open(file_dir + '/../config/centauro_parking_stack.yaml', 'r').read()
 ci = pyci.CartesianInterface.MakeInstance('OpenSot', ikpb, model, dt)
@@ -210,8 +202,17 @@ T = 5.0
 # fill the action_list starting from ModelInterface current configuration
 qinit = model.getJointPositionMap()
 for index, action in enumerate(q_cfg['actions'][args.action]):
-    if action == 'rotate_wheels':
-        qinit = rotate_wheels(qinit)
-    else:
-        cartesian_motion(qinit, q_cfg[action['q']], T, dt, ci, action['steering'])
-        qinit = q_cfg[action['q']]
+    if type(action) == str:
+        if action == 'rotate_wheels':
+            qinit = rotate_wheels(qinit)
+
+    if type(action) == dict:
+        if list(action.keys())[0] == 'rotate_ankle_pitch':
+            if 'box' in action['rotate_ankle_pitch']:
+                qinit = rotate_ankle_pitch(qinit, fold=action['rotate_ankle_pitch']['fold'], box=action['rotate_ankle_pitch']['box'])
+            else:
+                qinit = rotate_ankle_pitch(qinit, fold=action['rotate_ankle_pitch']['fold'])
+        else:
+            cartesian_motion(qinit, q_cfg[list(action.keys())[0]], T, dt, ci, action[list(action.keys())[0]]['steering'], action[list(action.keys())[0]]['change_steering'])
+            qinit = q_cfg[list(action.keys())[0]]
+
