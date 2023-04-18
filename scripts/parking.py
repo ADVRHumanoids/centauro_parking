@@ -8,6 +8,7 @@ import rospy
 import rospkg
 import argparse
 import os, sys
+import yaml
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -74,7 +75,21 @@ def compute_h_frame(model, w_T_base, contacts):
     Th.translation = p
     return Th
 
-def cartesian_motion(qinit, qgoal, T, dt, ci, parking):
+def cartesian_motion(qinit, qgoal, T, dt, ci, steering):
+    # set steering state...
+    if steering:
+        print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
+        ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
+        ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
+        ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
+        ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
+    else:
+        print(bcolors.OKGREEN + 'Disabling steering tasks' + bcolors.ENDC)
+        ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
+        ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
+        ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
+        ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
+
     time = 0
     while True:
         tau = time / T
@@ -92,26 +107,24 @@ def cartesian_motion(qinit, qgoal, T, dt, ci, parking):
             robot.move()
 
         time += dt
-        if parking:
-            if time > T:
-                if np.linalg.norm(qdot) < 0.01:
-                    if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Enabled:
-                        print(bcolors.OKGREEN + 'Disabling steering tasks' + bcolors.ENDC)
-                        ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Disabled)
-                        ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Disabled)
-                        ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Disabled)
-                        ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Disabled)
-                    break
-        else:
-            if time > T:
-                if ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Disabled:
-                    print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
-                    ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
-                    ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
-                    ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
-                    ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
-                if np.linalg.norm(qdot) < 0.01:
-                    break
+
+        # ...and change it before the action ends to avoid useless yaw rotations
+        if time > T:
+            if not steering and ci.getTask("steering_wheel_1").getActivationState() == pyci.ActivationState.Disabled:
+                print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
+                ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
+                ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
+                ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
+                ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
+            # else:
+            #     print(bcolors.OKGREEN + 'Enabling steering tasks' + bcolors.ENDC)
+            #     ci.getTask("steering_wheel_1").setActivationState(pyci.ActivationState.Enabled)
+            #     ci.getTask("steering_wheel_2").setActivationState(pyci.ActivationState.Enabled)
+            #     ci.getTask("steering_wheel_3").setActivationState(pyci.ActivationState.Enabled)
+            #     ci.getTask("steering_wheel_4").setActivationState(pyci.ActivationState.Enabled)
+            if np.linalg.norm(qdot) < 0.01:
+                break
+
         rate.sleep()
 
 def rotate_wheels(qinit):
@@ -143,31 +156,16 @@ def rotate_wheels(qinit):
 
 rospy.init_node('contact_homing')
 
+# load configurations
+with open(file_dir + '/../config/parking.yaml') as file:
+    q_cfg = yaml.load(file, Loader=yaml.FullLoader)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--unattended", action="store_true", help='the script does not ask for user confirmation before executing the action')
-parser.add_argument("--park", action="store_true")
-parser.add_argument("--unpark", action="store_true")
-parser.add_argument('--box', action="store_true")
+parser.add_argument("--action", choices=q_cfg['actions'].keys())
 args = parser.parse_args()
 
-parking = bool
-box = bool
-if args.park:
-    parking = True
-    if not args.unattended:
-        input(bcolors.OKGREEN + 'Start Parking: click to confirm' + bcolors.ENDC)
-elif args.unpark:
-    parking = False
-    if not args.unattended:
-        input(bcolors.OKGREEN + 'Start Unparking: click to confirm' + bcolors.ENDC)
-else:
-    print(bcolors.FAIL + "Missing mandatory argument '--park' '--unpark'" + bcolors.ENDC)
-    exit()
-
-if args.box:
-    box = True
-else:
-    box = False
+args.action = 'unparking'
 
 # create XBot config object
 urdf_path = rospkg.RosPack().get_path('centauro_urdf') + '/urdf/centauro.urdf'
@@ -188,47 +186,15 @@ try:
     ctrlmode['d435_head_joint'] = xbot.ControlMode.Idle()
     robot.setControlMode(ctrlmode)
 except:
-    print(bcolors.WARNING + 'RobotInterface not created' + bcolors.ENDC)
-    robot = None
+    print(bcolors.FAIL + 'RobotInterface not created' + bcolors.ENDC)
+    exit()
 
+# sync ModelInterface to RobotInterface current position references to avoid discontinuities
 model = xbot.ModelInterface(cfg)
-if robot is not None:
-    # sync ModelInterface to RobotInterface current position references to avoid discontinuities
-    qref = robot.getPositionReference()
-    qref = [0., 0., 0., 0., 0., 0.] + qref.tolist()
-    model.setJointPosition(qref)
-    model.update()
-else:
-    contacts = ['wheel_' + str(i + 1) for i in range(4)]
-    w_T_base = model.getPose('base_link')
-    w_T_h = compute_h_frame(model, w_T_base, contacts)
-    model.setFloatingBasePose(w_T_h.inverse() * w_T_base)
-    # if RobotInterface is not found start the ModelInterface in homing if parking or in rest configuration if unparking
-    if parking:
-        qhome = model.getRobotState("home")
-        model.setJointPosition(qhome)
-        model.update()
-    else:
-        q = model.getRobotState("home")
-        q = model.eigenToMap(q)
-        q["hip_pitch_1"] = -1.57
-        q["hip_pitch_2"] = 1.57
-        q["hip_pitch_3"] = 1.57
-        q["hip_pitch_4"] = -1.57
-        q["knee_pitch_1"] = -2.41
-        q["knee_pitch_2"] = 2.41
-        q["knee_pitch_3"] = 2.41
-        q["knee_pitch_4"] = -2.41
-        q['ankle_pitch_1'] = -2.41
-        q['ankle_pitch_2'] = 2.41
-        q['ankle_pitch_3'] = 2.41
-        q['ankle_pitch_4'] = -2.41
-        q["ankle_yaw_1"] = 0.0
-        q["ankle_yaw_2"] = 0.0
-        q["ankle_yaw_3"] = 0.0
-        q["ankle_yaw_4"] = 0.0
-        model.setJointPosition(q)
-        model.update()
+qref = robot.getPositionReference()
+qref = [0., 0., 0., 0., 0., 0.] + qref.tolist()
+model.setJointPosition(qref)
+model.update()
 
 rspub = pyci.RobotStatePublisher(model)
 rspub.publishTransforms('park')
@@ -238,109 +204,14 @@ ikpb = open(file_dir + '/../config/centauro_parking_stack.yaml', 'r').read()
 ci = pyci.CartesianInterface.MakeInstance('OpenSot', ikpb, model, dt)
 postural = ci.getTask('Postural')
 
-# always start from ModelInterface current configuration
-q1 = model.getJointPosition()
-q1 = model.eigenToMap(q1)
-
-q2 = list()
-if parking:
-    # generate intermediate pose: pitch folded and ankle perpendicular to the ground
-    q2 = q1.copy()
-    # if box:
-    q2["hip_yaw_1"] = 0 #-0.75
-    q2["hip_yaw_2"] = 0 #0.75
-    q2["hip_yaw_3"] = 0 #0.75
-    q2["hip_yaw_4"] = 0 #-0.75
-    # else:
-    #     q2["hip_yaw_1"] = -0.75
-    #     q2["hip_yaw_2"] = 0.75
-    #     q2["hip_yaw_3"] = 0.75
-    #     q2["hip_yaw_4"] = -0.75
-    q2["hip_pitch_1"] = -1.57
-    q2["hip_pitch_2"] = 1.57
-    q2["hip_pitch_3"] = 1.57
-    q2["hip_pitch_4"] = -1.57
-    q2["knee_pitch_1"] = -2.4
-    q2["knee_pitch_2"] = 2.4
-    q2["knee_pitch_3"] = 2.4
-    q2["knee_pitch_4"] = -2.4
-    q2["ankle_pitch_1"] = -0.84
-    q2["ankle_pitch_2"] = 0.84
-    q2["ankle_pitch_3"] = 0.84
-    q2["ankle_pitch_4"] = -0.84
-    q2["ankle_yaw_1"] = 0.0
-    q2["ankle_yaw_2"] = 0.0
-    q2["ankle_yaw_3"] = 0.0
-    q2["ankle_yaw_4"] = 0.0
-
-    # generate final configuration: if parking -> fold the ankle
-    q3 = q2.copy()
-    q3['ankle_pitch_1'] = -2.4
-    q3['ankle_pitch_2'] = 2.4
-    # if box:
-    q3['ankle_pitch_3'] = 2.4 - np.pi
-    q3['ankle_pitch_4'] = -2.4 + np.pi
-    # else:
-        # q3['ankle_pitch_3'] = 2.4
-        # q3['ankle_pitch_4'] = -2.4
-
-else:
-    # generate intermediate pose: pitch folded and ankle perpendicular to the ground
-    q2 = q1.copy()
-    # q2["hip_yaw_1"] = -0.75
-    # q2["hip_yaw_2"] = 0.75
-    # q2["hip_yaw_3"] = 0.75
-    # q2["hip_yaw_4"] = -0.75
-    q2["hip_pitch_1"] = -1.57
-    q2["hip_pitch_2"] = 1.57
-    q2["hip_pitch_3"] = 1.57
-    q2["hip_pitch_4"] = -1.57
-    q2["knee_pitch_1"] = -2.4
-    q2["knee_pitch_2"] = 2.4
-    q2["knee_pitch_3"] = 2.4
-    q2["knee_pitch_4"] = -2.4
-    q2["ankle_pitch_1"] = -0.84
-    q2["ankle_pitch_2"] = 0.84
-    q2["ankle_pitch_3"] = 0.84
-    q2["ankle_pitch_4"] = -0.84
-    q2["ankle_yaw_1"] = 0.0
-    q2["ankle_yaw_2"] = 0.0
-    q2["ankle_yaw_3"] = 0.0
-    q2["ankle_yaw_4"] = 0.0
-
-    # generate final configuration: if unparking -> homing
-    q3 = model.getRobotState("home")
-    q3 = model.eigenToMap(q3)
-    q3["ankle_yaw_1"] = 0.0
-    q3["ankle_yaw_2"] = 0.0
-    q3["ankle_yaw_3"] = 0.0
-    q3["ankle_yaw_4"] = 0.0
-
-
 rate = rospy.Rate(1./dt)
-
-if not parking:
-    q1 = rotate_wheels(q1)
-
-# solve ik to move from q1 to q2
 T = 5.0
-cartesian_motion(q1, q2, T, dt, ci, parking)
 
-# solve ik to move from q2 to q3
-q = model.getJointPositionMap()
-q2['VIRTUALJOINT_1'] = q['VIRTUALJOINT_1']
-q2['VIRTUALJOINT_2'] = q['VIRTUALJOINT_2']
-q2['VIRTUALJOINT_3'] = q['VIRTUALJOINT_3']
-q2['VIRTUALJOINT_4'] = q['VIRTUALJOINT_4']
-q2['VIRTUALJOINT_5'] = q['VIRTUALJOINT_5']
-q2['VIRTUALJOINT_6'] = q['VIRTUALJOINT_6']
-
-if parking:
-    q2 = rotate_wheels(q2)
-
-# if parking:
-#     cartesian_motion(q2, q3, T, dt, ci, parking)
-# else:
-if not box:
-    cartesian_motion(q2, q3, T, dt, ci, parking)
-
+# fill the action_list starting from ModelInterface current configuration
+qinit = model.getJointPositionMap()
+for index, action in enumerate(q_cfg['actions'][args.action]):
+    if action == 'rotate_wheels':
+        qinit = rotate_wheels(qinit)
+    else:
+        cartesian_motion(qinit, q_cfg[action['q']], T, dt, ci, action['steering'])
+        qinit = q_cfg[action['q']]

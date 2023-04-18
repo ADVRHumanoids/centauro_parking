@@ -122,12 +122,12 @@ Postural:
     lambda: 0.01
     weight: 0.1
     disabled_joints:
-      - VIRTUALJOINT_1
-      - VIRTUALJOINT_2
+#      - VIRTUALJOINT_1
+#      - VIRTUALJOINT_2
       - VIRTUALJOINT_3
-      - VIRTUALJOINT_4
-      - VIRTUALJOINT_5
-      - VIRTUALJOINT_6
+#      - VIRTUALJOINT_4
+#      - VIRTUALJOINT_5
+#      - VIRTUALJOINT_6
       - ankle_yaw_1
       - ankle_yaw_2
       - ankle_yaw_3
