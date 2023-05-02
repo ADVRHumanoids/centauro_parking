@@ -160,8 +160,6 @@ parser.add_argument("--unattended", action="store_true", help='the script does n
 parser.add_argument("--action", choices=q_cfg['actions'].keys())
 args = parser.parse_args()
 
-args.action = 'boxing'
-
 # create XBot config object
 urdf_path = rospkg.RosPack().get_path('centauro_urdf') + '/urdf/centauro.urdf'
 urdf = open(urdf_path, 'r').read()

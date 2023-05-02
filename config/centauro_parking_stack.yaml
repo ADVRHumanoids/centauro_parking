@@ -14,7 +14,7 @@ stack:
 constraints: [JointLimits, VelocityLimits] #, Collision]
 
 defines:
-    &wheel_radius 0.078
+    &wheel_radius 0.124
 
 
 JointLimits:
@@ -49,6 +49,7 @@ Steering_FL:
     wheel_name: wheel_1
     weight: 100.0
     lib_name: libcentauro_cartesio_addon.so
+    deadzone: 0.005
     lambda: 0.1
 
 Steering_FR:
@@ -56,6 +57,7 @@ Steering_FR:
     wheel_name: wheel_2
     weight: 100.0
     lib_name: libcentauro_cartesio_addon.so
+    deadzone: 0.005
     lambda: 0.1
 
 Steering_HL:
@@ -63,6 +65,7 @@ Steering_HL:
     wheel_name: wheel_3
     weight: 100.0
     lib_name: libcentauro_cartesio_addon.so
+    deadzone: 0.005
     lambda: 0.1
 
 Steering_HR:
@@ -70,6 +73,7 @@ Steering_HR:
     wheel_name: wheel_4
     weight: 100.0
     lib_name: libcentauro_cartesio_addon.so
+    deadzone: 0.005
     lambda: 0.1
 
 Rolling_FL:
