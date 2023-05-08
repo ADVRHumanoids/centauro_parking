@@ -41,7 +41,7 @@ q_unparking:
   ankle_pitch_3: 0.84
   ankle_pitch_4: -0.84
 
-q_homing:
+q_homing: &q_homing
   hip_yaw_1: -0.75
   hip_yaw_2: 0.75
   hip_yaw_3: 0.75
@@ -58,7 +58,6 @@ q_homing:
   knee_pitch_2: 1.56
   knee_pitch_3: 1.56
   knee_pitch_4: -1.56
-  d435_head_joint: 0.0
   j_arm1_1: 0.52
   j_arm1_2: 0.32
   j_arm1_3: 0.28
@@ -71,6 +70,24 @@ q_homing:
   j_arm2_4: -2.24
   j_arm2_5: -0.05
   j_arm2_6: -0.78
+  torso_yaw: 0.0
+  d435_head_joint: -0.6
+
+
+q_homing_reversed_knee:  
+  <<: *q_homing
+  hip_yaw_1: -0.749
+  hip_pitch_1: -0.088
+  knee_pitch_1: 1.56
+  ankle_pitch_1: 1.64
+  ankle_yaw_1: 0.74
+  hip_yaw_2: 0.749
+  hip_pitch_2: 0.088
+  knee_pitch_2: -1.56
+  ankle_pitch_2: -1.64
+  ankle_yaw_2: -0.74
+
+
 
 q_boxing_2:
   hip_yaw_1: 0.0
@@ -136,6 +153,11 @@ actions:
 
   homing:
     - q_homing:
+        steering: true
+        change_steering: false
+
+  homing_reversed_knee:
+    - q_homing_reversed_knee:
         steering: true
         change_steering: false
 

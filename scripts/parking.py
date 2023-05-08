@@ -97,18 +97,23 @@ def cartesian_motion(qinit, qgoal, T, dt, ci, steering, change_steering):
 
         rate.sleep()
 
-def rotate_wheels(qinit):
-    q = qinit.copy()
-    q['ankle_yaw_1'] = 0.0
-    q['ankle_yaw_2'] = 0.0
-    q['ankle_yaw_3'] = 0.0
-    q['ankle_yaw_4'] = 0.0
+    rotate_wheels(model.getJointPositionMap(), qgoal)
+
+def rotate_wheels(qinit, qgoal=None):
+    if qgoal is None:
+        qgoal = qinit.copy()
+        qgoal['ankle_yaw_1'] = 0.0
+        qgoal['ankle_yaw_2'] = 0.0
+        qgoal['ankle_yaw_3'] = 0.0
+        qgoal['ankle_yaw_4'] = 0.0
     time = 0
     T = 1.0
+    dt = 0.01
+    rate = rospy.Rate(1./dt)
     while time < T:
         tau = time / T
         alpha = quintic(tau)
-        qref = model.mapToEigen(qinit) * (1 - alpha) + model.mapToEigen(q) * alpha
+        qref = model.mapToEigen(qinit) * (1 - alpha) + model.mapToEigen(qgoal) * alpha
         model.setJointPosition(qref)
         model.update()
         robot.setPositionReference(qref[6:])
@@ -116,7 +121,7 @@ def rotate_wheels(qinit):
         time += dt
         rate.sleep()
 
-    return q
+    return qgoal
 
 def rotate_ankle_pitch(qinit, fold, box=False):
     q = qinit.copy()
@@ -175,8 +180,6 @@ try:
     robot.sense()
     robot.setControlMode(xbot.ControlMode.Position())
     ctrlmode = {'j_wheel_{}'.format(i+1) : xbot.ControlMode.Velocity() for i in range(4)}
-    ctrlmode['neck_velodyne'] = xbot.ControlMode.Idle()
-    ctrlmode['d435_head_joint'] = xbot.ControlMode.Idle()
     robot.setControlMode(ctrlmode)
 except:
     print(bcolors.FAIL + 'RobotInterface not created' + bcolors.ENDC)
