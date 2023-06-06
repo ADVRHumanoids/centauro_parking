@@ -135,11 +135,22 @@ Postural:
 #      - VIRTUALJOINT_4
 #      - VIRTUALJOINT_5
 #      - VIRTUALJOINT_6
-      - ankle_yaw_1
-      - ankle_yaw_2
-      - ankle_yaw_3
-      - ankle_yaw_4
+    #   - ankle_yaw_1
+    #   - ankle_yaw_2
+    #   - ankle_yaw_3
+    #   - ankle_yaw_4
       - j_wheel_1
       - j_wheel_2
       - j_wheel_3
       - j_wheel_4
+
+
+# Postural:
+#     type: Postural
+#     lambda: 0.01
+#     weight: 0.1
+#     enabled_joints:
+#       - ankle_yaw_1
+#       - ankle_yaw_2
+#       - ankle_yaw_3
+#       - ankle_yaw_4

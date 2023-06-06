@@ -10,6 +10,9 @@ import argparse
 import os, sys
 import yaml
 
+from std_srvs.srv import Trigger
+from xbot_msgs.msg import JointState
+
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
 if sys.version_info[0] < 3:
@@ -152,9 +155,34 @@ def rotate_ankle_pitch(qinit, fold, box=False):
         time += dt
         rate.sleep()
 
-    return q
+    return args.action
 
-rospy.init_node('contact_homing')
+def action_service(req):
+    T = 5.0
+    dt = 0.01
+
+    # fill the action_list starting from ModelInterface current configuration
+    qref = model.getJointPosition()
+    qref = model.eigenToMap(qref)
+    for jn, q in zip(last_js.name, last_js.position_reference):
+        qref[jn] = q
+    model.setJointPosition(qref)
+    model.update()
+
+    qinit = model.getJointPositionMap()
+    for index, action in enumerate(q_cfg['actions']['homing_legs']):
+        if type(action) == str:
+            if action == 'rotate_wheels':
+                qinit = rotate_wheels(qinit)
+
+        if type(action) == dict:
+            cartesian_motion(qinit, q_cfg[list(action.keys())[0]], T, dt, ci, action[list(action.keys())[0]]['steering'], action[list(action.keys())[0]]['change_steering'])
+            qinit = q_cfg[list(action.keys())[0]]
+
+    return True
+
+
+rospy.init_node('homing_action_server')
 
 # load configurations
 with open(file_dir + '/../config/parking.yaml') as file:
@@ -187,10 +215,6 @@ except:
 
 # sync ModelInterface to RobotInterface current position references to avoid discontinuities
 model = xbot.ModelInterface(cfg)
-qref = robot.getPositionReference()
-qref = [0., 0., 0., 0., 0., 0.] + qref.tolist()
-model.setJointPosition(qref)
-model.update()
 
 dt = 0.01
 ikpb = open(file_dir + '/../config/centauro_parking_stack.yaml', 'r').read()
@@ -198,22 +222,14 @@ ci = pyci.CartesianInterface.MakeInstance('OpenSot', ikpb, model, dt)
 postural = ci.getTask('Postural')
 
 rate = rospy.Rate(1./dt)
-T = 5.0
 
-# fill the action_list starting from ModelInterface current configuration
-qinit = model.getJointPositionMap()
-for index, action in enumerate(q_cfg['actions'][args.action]):
-    if type(action) == str:
-        if action == 'rotate_wheels':
-            qinit = rotate_wheels(qinit)
+last_js: JointState = None
 
-    if type(action) == dict:
-        if list(action.keys())[0] == 'rotate_ankle_pitch':
-            if 'box' in action['rotate_ankle_pitch']:
-                qinit = rotate_ankle_pitch(qinit, fold=action['rotate_ankle_pitch']['fold'], box=action['rotate_ankle_pitch']['box'])
-            else:
-                qinit = rotate_ankle_pitch(qinit, fold=action['rotate_ankle_pitch']['fold'])
-        else:
-            cartesian_motion(qinit, q_cfg[list(action.keys())[0]], T, dt, ci, action[list(action.keys())[0]]['steering'], action[list(action.keys())[0]]['change_steering'])
-            qinit = q_cfg[list(action.keys())[0]]
+def on_js_recv(msg: JointState):
+    global last_js
+    last_js = msg
 
+sub = rospy.Subscriber('/xbotcore/joint_states', JointState, on_js_recv, queue_size=1)
+
+rospy.Service('homing_legs_service', Trigger, action_service)
+rospy.spin()
